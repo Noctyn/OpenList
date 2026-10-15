@@ -96,6 +96,7 @@ Thank you for your support and understanding of the OpenList project.
   - [x] [Teldrive](https://github.com/tgdrive/teldrive)
   - [x] [Weiyun](https://www.weiyun.com)
   - [x] DingTalk Docs ([China](https://alidocs.dingtalk.com/), [International](https://docs.dingtalk.io/))
+  - [x] [Feishu](https://www.feishu.cn) / [LarkSuite](https://www.larksuite.com)
 - [x] Easy to deploy and out-of-the-box
 - [x] File preview (PDF, markdown, code, plain text, ...)
 - [x] Image preview in gallery mode

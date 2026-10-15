@@ -95,6 +95,7 @@ OpenListプロジェクトへのご支援とご理解をありがとうござい
   - [x] [Teldrive](https://github.com/tgdrive/teldrive)
   - [x] [Weiyun](https://www.weiyun.com)
   - [x] DingTalk ドキュメント（[中国版](https://alidocs.dingtalk.com/)、[国際版](https://docs.dingtalk.io/)）
+  - [x] [Feishu](https://www.feishu.cn) / [LarkSuite](https://www.larksuite.com)
   - [x] [MediaFire](https://www.mediafire.com)
 - [x] 簡単にデプロイでき、すぐに使える
 - [x] ファイルプレビュー（PDF、markdown、コード、テキストなど）
