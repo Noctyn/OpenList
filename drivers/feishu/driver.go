@@ -38,10 +38,6 @@ func (d *FeishuBase) Init(ctx context.Context) error {
 	return nil
 }
 
-func (d *FeishuBase) Drop(ctx context.Context) error {
-	d.client = nil
-	return nil
-}
 
 func (d *FeishuBase) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
 	parentToken := dir.GetID()
