@@ -1,0 +1,153 @@
+name: Build on Tag
+
+on:
+  push:
+    tags:
+      - '*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag name for release (optional, defaults to current tag/ref)'
+        required: false
+        default: ''
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }}-${{ matrix.arch }}${{ matrix.goarm && format('-v{0}', matrix.goarm) || '' }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows
+            arch: amd64
+            ext: .exe
+          - os: windows
+            arch: arm64
+            ext: .exe
+          - os: windows
+            arch: 386
+            ext: .exe
+          - os: linux
+            arch: amd64
+            ext: ''
+          - os: linux
+            arch: arm64
+            ext: ''
+          - os: linux
+            arch: arm
+            goarm: 7
+            ext: ''
+          - os: darwin
+            arch: amd64
+            ext: ''
+          - os: darwin
+            arch: arm64
+            ext: ''
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.27.1'
+
+      - name: Setup web frontend
+        run: |
+          bash build.sh dev web || true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          FRONTEND_REPO: ${{ vars.FRONTEND_REPO }}
+
+      - name: Compile binary
+        run: |
+          set -e
+          TAG_NAME="${{ github.ref_name }}"
+          if [ -n "${{ inputs.tag_name }}" ]; then
+            TAG_NAME="${{ inputs.tag_name }}"
+          fi
+          BUILT_AT="$(date +'%F %T %z')"
+          GIT_COMMIT="${{ github.sha }}"
+
+          LDFLAGS="-w -s \
+            -X 'github.com/OpenListTeam/OpenList/v4/internal/conf.Version=${TAG_NAME}' \
+            -X 'github.com/OpenListTeam/OpenList/v4/internal/conf.BuiltAt=${BUILT_AT}' \
+            -X 'github.com/OpenListTeam/OpenList/v4/internal/conf.GitCommit=${GIT_COMMIT}' \
+            -X 'github.com/OpenListTeam/OpenList/v4/internal/conf.WebVersion=release'"
+
+          OUT_DIR="dist"
+          mkdir -p "$OUT_DIR"
+
+          TARGET_NAME="openlist-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.goarm && format('-v{0}', matrix.goarm) || '' }}"
+          BIN_NAME="${TARGET_NAME}${{ matrix.ext }}"
+
+          echo "Compiling ${BIN_NAME}..."
+          CGO_ENABLED=0 GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} GOARM=${{ matrix.goarm || '' }} \
+            go build -tags=jsoniter -ldflags="$LDFLAGS" -o "${OUT_DIR}/${BIN_NAME}" .
+
+          cd "$OUT_DIR"
+          if [ "${{ matrix.os }}" = "windows" ]; then
+            zip -9 "${TARGET_NAME}.zip" "${BIN_NAME}"
+            rm "${BIN_NAME}"
+          else
+            tar -czvf "${TARGET_NAME}.tar.gz" "${BIN_NAME}"
+            rm "${BIN_NAME}"
+          fi
+          sha256sum * > "${TARGET_NAME}.sha256"
+          cd ..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: openlist-${{ matrix.os }}-${{ matrix.arch }}${{ matrix.goarm && format('-v{0}', matrix.goarm) || '' }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: Publish Release Assets
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: all_dist
+          merge-multiple: true
+
+      - name: Aggregate checksums
+        run: |
+          mkdir -p release_assets
+          cp all_dist/* release_assets/ 2>/dev/null || true
+          cd release_assets
+          cat *.sha256 | sort -u > checksums.txt
+          rm -f *.sha256
+          ls -la
+          cd ..
+
+      - name: Publish to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          if [ -n "${{ inputs.tag_name }}" ]; then
+            TAG_NAME="${{ inputs.tag_name }}"
+          fi
+
+          echo "Publishing assets for tag: ${TAG_NAME}"
+          if gh release view "${TAG_NAME}" >/dev/null 2>&1; then
+            echo "Release exists, uploading assets..."
+            gh release upload "${TAG_NAME}" release_assets/* --clobber
+          else
+            echo "Creating release and uploading assets..."
+            gh release create "${TAG_NAME}" release_assets/* --title "${TAG_NAME}" --generate-notes
+          fi
