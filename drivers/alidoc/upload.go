@@ -69,7 +69,7 @@ func (d *AliDoc) getUploadInfo(ctx context.Context, parentDentryUUID, name strin
 		SetBody(body).
 		SetResult(&result).
 		SetError(&result).
-		Post(apiBase + "/box/api/v2/file/uploadinfo")
+		Post(d.apiBase() + "/box/api/v2/file/uploadinfo")
 	if err != nil {
 		return result, err
 	}
@@ -104,7 +104,7 @@ func (d *AliDoc) commitUpload(ctx context.Context, parentDentryUUID, name string
 		SetBody(body).
 		SetResult(&result).
 		SetError(&result).
-		Post(apiBase + "/box/api/v2/file/commit")
+		Post(d.apiBase() + "/box/api/v2/file/commit")
 	if err != nil {
 		return err
 	}

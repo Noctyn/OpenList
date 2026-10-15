@@ -3,22 +3,81 @@ package alidoc
 import (
 	"context"
 	"fmt"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/OpenListTeam/OpenList/v4/drivers/base"
 	"github.com/OpenListTeam/OpenList/v4/internal/model"
+	"github.com/OpenListTeam/OpenList/v4/pkg/cookie"
 	"github.com/go-resty/resty/v2"
 )
 
-const apiBase = "https://alidocs.dingtalk.com"
+const (
+	ChinaSite         = "china"
+	InternationalSite = "international"
+
+	chinaBaseURL         = "https://alidocs.dingtalk.com"
+	internationalBaseURL = "https://docs.dingtalk.io"
+)
+
+func cleanBaseURL(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+	if !strings.HasPrefix(raw, "http://") && !strings.HasPrefix(raw, "https://") {
+		raw = "https://" + raw
+	}
+	u, err := url.Parse(raw)
+	if err == nil && u.Scheme != "" && u.Host != "" {
+		return fmt.Sprintf("%s://%s", u.Scheme, u.Host)
+	}
+	return strings.TrimRight(raw, "/")
+}
+
+func (d *AliDoc) apiBase() string {
+	if custom := cleanBaseURL(d.CustomBaseURL); custom != "" {
+		return custom
+	}
+
+	site := strings.TrimSpace(strings.ToLower(d.Site))
+	switch {
+	case site == InternationalSite || site == "intl" || site == "global" || site == "io" || strings.Contains(site, "dingtalk.io"):
+		return internationalBaseURL
+	case strings.HasPrefix(site, "http://") || strings.HasPrefix(site, "https://"):
+		if cleaned := cleanBaseURL(site); cleaned != "" {
+			return cleaned
+		}
+		return strings.TrimRight(site, "/")
+	default:
+		return chinaBaseURL
+	}
+}
+
+func getCookieValue(cookieStr, key string) string {
+	for _, c := range cookie.Parse(cookieStr) {
+		if strings.EqualFold(c.Name, key) {
+			return c.Value
+		}
+	}
+	return ""
+}
 
 func (d *AliDoc) request(ctx context.Context) *resty.Request {
-	return d.client.R().
+	req := d.client.R().
 		SetContext(ctx).
 		SetHeader("Cookie", d.Cookie).
 		SetHeader("Accept", "application/json, text/plain, */*").
-		SetHeader("Referer", apiBase+"/").
-		SetHeader("Origin", apiBase)
+		SetHeader("Referer", d.apiBase()+"/").
+		SetHeader("Origin", d.apiBase())
+	if xsrf := getCookieValue(d.Cookie, "XSRF-TOKEN"); xsrf != "" {
+		req.SetHeader("x-xsrf-token", xsrf)
+	}
+	if corpID := getCookieValue(d.Cookie, "portal_corp_id"); corpID != "" {
+		req.SetHeader("corp-id", corpID)
+	}
+	return req
 }
 
 func msToTime(v int64) time.Time {
@@ -75,7 +134,7 @@ func (d *AliDoc) post(ctx context.Context, path string, body interface{}) error 
 		SetBody(body).
 		SetResult(&result).
 		SetError(&result).
-		Post(apiBase + path)
+		Post(d.apiBase() + path)
 	if err != nil {
 		return err
 	}
@@ -87,7 +146,7 @@ func (d *AliDoc) checkCookie(ctx context.Context) error {
 	resp, err := d.request(ctx).
 		SetResult(&result).
 		SetError(&result).
-		Get(apiBase + "/portal/api/v1/mine/info")
+		Get(d.apiBase() + "/portal/api/v1/mine/info")
 	if err != nil {
 		return err
 	}
@@ -105,7 +164,7 @@ func (d *AliDoc) list(ctx context.Context, dentryUUID string) ([]dentry, error) 
 		SetQueryParam("pageSize", "1000").
 		SetResult(&result).
 		SetError(&result).
-		Get(apiBase + "/box/api/v2/dentry/list")
+		Get(d.apiBase() + "/box/api/v2/dentry/list")
 	if err != nil {
 		return nil, err
 	}
@@ -124,7 +183,7 @@ func (d *AliDoc) download(ctx context.Context, dentryUUID string) (downloadResp,
 		SetQueryParam("downloadType", "URL_PRE_SIGNATURE").
 		SetResult(&result).
 		SetError(&result).
-		Get(apiBase + "/box/api/v2/file/download")
+		Get(d.apiBase() + "/box/api/v2/file/download")
 	if err != nil {
 		return result, err
 	}

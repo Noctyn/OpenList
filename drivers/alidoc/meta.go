@@ -7,7 +7,9 @@ import (
 
 type Addition struct {
 	driver.RootID
-	Cookie string `json:"cookie" type:"text" required:"true" help:"钉钉文档网页 Cookie"`
+	Site          string `json:"site" type:"select" options:"china,international" default:"china" help:"站点版本：china (国内版 alidocs.dingtalk.com), international (国际版 docs.dingtalk.io)"`
+	CustomBaseURL string `json:"custom_base_url" help:"自定义接口地址 (例如 https://docs.dingtalk.io)，留空则根据站点版本自动配置"`
+	Cookie        string `json:"cookie" type:"text" required:"true" help:"钉钉文档网页 Cookie"`
 }
 
 var config = driver.Config{
@@ -18,6 +20,10 @@ var config = driver.Config{
 
 func init() {
 	op.RegisterDriver(func() driver.Driver {
-		return &AliDoc{}
+		return &AliDoc{
+			Addition: Addition{
+				Site: ChinaSite,
+			},
+		}
 	})
 }

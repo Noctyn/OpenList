@@ -30,6 +30,11 @@ func (d *AliDoc) GetAddition() driver.Additional {
 func (d *AliDoc) Init(ctx context.Context) error {
 	d.Cookie = strings.TrimSpace(d.Cookie)
 	d.RootFolderID = strings.TrimSpace(d.RootFolderID)
+	d.Site = strings.TrimSpace(d.Site)
+	d.CustomBaseURL = strings.TrimSpace(d.CustomBaseURL)
+	if d.Site == "" {
+		d.Site = ChinaSite
+	}
 	if d.Cookie == "" {
 		return fmt.Errorf("cookie is empty")
 	}
@@ -80,7 +85,7 @@ func (d *AliDoc) Link(ctx context.Context, file model.Obj, args model.LinkArgs) 
 		URL: url,
 		Header: http.Header{
 			"User-Agent": []string{base.UserAgent},
-			"Referer":    []string{apiBase + "/"},
+			"Referer":    []string{d.apiBase() + "/"},
 		},
 	}, nil
 }
