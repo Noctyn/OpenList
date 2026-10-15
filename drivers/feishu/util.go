@@ -108,8 +108,11 @@ func (d *FeishuBase) request(ctx context.Context, path string, method string, ca
 	}
 
 	for _, c := range res.Cookies() {
-		if strings.EqualFold(c.Name, "_csrf_token") && c.Value != "" {
-			d.Cookie = cookie.SetStr(d.Cookie, c.Name, c.Value)
+		if c.Value != "" {
+			switch strings.ToLower(c.Name) {
+			case "_csrf_token", "csrf_token", "swp_csrf_token", "sl_session", "session", "passport_app_access_token":
+				d.Cookie = cookie.SetStr(d.Cookie, c.Name, c.Value)
+			}
 		}
 	}
 

@@ -1,6 +1,8 @@
 package feishu
 
 import (
+	"context"
+
 	"github.com/OpenListTeam/OpenList/v4/internal/driver"
 	"github.com/OpenListTeam/OpenList/v4/internal/op"
 )
@@ -33,12 +35,27 @@ func (d *Feishu) Config() driver.Config {
 	return feishuConfig
 }
 
+func (d *Feishu) Drop(ctx context.Context) error {
+	d.client = nil
+	if d.GetStorage().ID != 0 {
+		op.MustSaveDriverStorage(d)
+	}
+	return nil
+}
 type LarkSuite struct {
 	FeishuBase
 }
 
 func (d *LarkSuite) Config() driver.Config {
 	return larkConfig
+}
+
+func (d *LarkSuite) Drop(ctx context.Context) error {
+	d.client = nil
+	if d.GetStorage().ID != 0 {
+		op.MustSaveDriverStorage(d)
+	}
+	return nil
 }
 
 var (
